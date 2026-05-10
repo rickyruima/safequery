@@ -1,0 +1,17 @@
+[project]
+name = "safequery"
+version = "0.1.0"
+description = "A safety layer between your AI agent and your database"
+requires-python = ">=3.10"
+dependencies = [
+    "pglast>=6.0",
+    "pydantic>=2.0",
+    "structlog>=24.0",
+]
+
+[project.scripts]
+safequery = "safequery.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
