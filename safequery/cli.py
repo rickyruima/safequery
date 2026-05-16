@@ -43,9 +43,12 @@ def check(sql: str, config: str | None, dialect: str, dry_run: bool):
     if result.violations:
         click.echo("")
         for v in result.violations:
-            click.echo(f"  Rule: {v.rule}")
-            click.echo(f"  Severity: {v.severity}")
-            click.echo(f"  Action: {v.action}")
+            v_color = action_colors.get(v.action, "white")
+            severity_colors = {"critical": "red", "high": "magenta", "medium": "yellow", "low": "cyan"}
+            s_color = severity_colors.get(v.severity, "white")
+            click.echo(f"  Rule: {click.style(v.rule, bold=True)}")
+            click.echo(f"  Severity: {click.style(v.severity, fg=s_color)}")
+            click.echo(f"  Action: {click.style(v.action, fg=v_color, bold=True)}")
             click.echo(f"  Reason: {v.reason}")
             click.echo("")
 

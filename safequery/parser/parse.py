@@ -18,6 +18,13 @@ class ParsedQuery:
     has_limit: bool = False
     subquery_depth: int = 0
     is_select_star: bool = False
+    is_alter_drop_column: bool = False
+    has_tautology_where: bool = False  # WHERE 1=1 or WHERE true
+    in_clause_max_values: int = 0
+    has_cross_join: bool = False
+    is_grant_all: bool = False
+    join_count: int = 0
+    has_union: bool = False
     error: Optional[str] = None
 
 
@@ -38,6 +45,13 @@ def parse_sql(sql: str, dialect: str = "postgres") -> ParsedQuery:
     has_limit = _has_limit_clause(ast)
     subquery_depth = _get_subquery_depth(ast)
     is_select_star = _is_select_star(ast)
+    is_alter_drop_column = _is_alter_drop_column(ast)
+    has_tautology_where = _has_tautology_where(ast)
+    in_clause_max_values = _get_in_clause_max_values(ast)
+    has_cross_join = _has_cross_join(ast, sql)
+    is_grant_all = _is_grant_all(sql)
+    join_count = _get_join_count(ast)
+    has_union = _has_union(ast, sql)
 
     return ParsedQuery(
         raw_sql=sql,
@@ -47,6 +61,13 @@ def parse_sql(sql: str, dialect: str = "postgres") -> ParsedQuery:
         has_limit=has_limit,
         subquery_depth=subquery_depth,
         is_select_star=is_select_star,
+        is_alter_drop_column=is_alter_drop_column,
+        has_tautology_where=has_tautology_where,
+        in_clause_max_values=in_clause_max_values,
+        has_cross_join=has_cross_join,
+        is_grant_all=is_grant_all,
+        join_count=join_count,
+        has_union=has_union,
     )
 
 
@@ -130,3 +151,93 @@ def _is_select_star(ast: exp.Expression) -> bool:
     for select_expr in ast.find_all(exp.Star):
         return True
     return False
+
+
+def _is_alter_drop_column(ast: exp.Expression) -> bool:
+    """Check if this is an ALTER TABLE ... DROP COLUMN statement."""
+    if not isinstance(ast, exp.Alter):
+        return False
+    sql_upper = ast.sql().upper()
+    return "DROP" in sql_upper and "COLUMN" in sql_upper
+
+
+def _has_tautology_where(ast: exp.Expression) -> bool:
+    """Check if WHERE clause is a tautology like WHERE 1=1 or WHERE true."""
+    where = ast.find(exp.Where)
+    if where is None:
+        return False
+    condition = where.this
+    if isinstance(condition, exp.EQ):
+        left = condition.left
+        right = condition.right
+        if isinstance(left, exp.Literal) and isinstance(right, exp.Literal):
+            if left.this == right.this:
+                return True
+    if isinstance(condition, exp.Boolean) and condition.this:
+        return True
+    return False
+
+
+def _get_in_clause_max_values(ast: exp.Expression) -> int:
+    """Get the maximum number of values in any IN clause."""
+    max_values = 0
+    for in_node in ast.find_all(exp.In):
+        # Count the values in the IN expression
+        expressions = in_node.expressions
+        if expressions:
+            max_values = max(max_values, len(expressions))
+    return max_values
+
+
+def _has_cross_join(ast: exp.Expression, sql: str) -> bool:
+    """Check for CROSS JOIN or implicit cross join (FROM a, b)."""
+    # Check for explicit CROSS JOIN
+    for join in ast.find_all(exp.Join):
+        if hasattr(join, 'kind') and join.kind and join.kind.upper() == "CROSS":
+            return True
+        # Also check the join side
+        join_sql = join.sql().upper()
+        if "CROSS JOIN" in join_sql:
+            return True
+
+    # Check for implicit cross join (FROM a, b) - multiple tables in FROM without JOIN
+    sql_upper = sql.upper().strip()
+    if isinstance(ast, exp.Select):
+        from_clause = ast.find(exp.From)
+        if from_clause:
+            # If there are multiple tables in FROM and no JOIN keywords connecting them
+            # that indicates an implicit cross join
+            tables_in_from = list(from_clause.find_all(exp.Table))
+            # Also check for comma-separated tables (implicit cross join)
+            # sqlglot represents "FROM a, b" with Join nodes of kind ""
+            joins = list(ast.find_all(exp.Join))
+            for join in joins:
+                if not join.kind or join.kind == "":
+                    # This is an implicit cross join (comma-separated)
+                    return True
+
+    # Fallback: check raw SQL for CROSS JOIN
+    if "CROSS JOIN" in sql_upper:
+        return True
+
+    return False
+
+
+def _is_grant_all(sql: str) -> bool:
+    """Check for GRANT ALL PRIVILEGES."""
+    sql_upper = sql.upper().strip()
+    return sql_upper.startswith("GRANT") and ("ALL PRIVILEGES" in sql_upper or "ALL" in sql_upper.split("GRANT")[1].split("ON")[0] if "ON" in sql_upper else "ALL" in sql_upper)
+
+
+def _get_join_count(ast: exp.Expression) -> int:
+    """Count the number of JOIN operations."""
+    return len(list(ast.find_all(exp.Join)))
+
+
+def _has_union(ast: exp.Expression, sql: str) -> bool:
+    """Check if query uses UNION."""
+    if ast.find(exp.Union):
+        return True
+    # Fallback check on raw SQL
+    sql_upper = sql.upper()
+    return " UNION " in sql_upper

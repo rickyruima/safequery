@@ -18,8 +18,16 @@ class PolicyConfig:
     delete_without_limit: str = "WARN"
     update_without_limit: str = "WARN"
     protected_table_modification: str = "WARN"
+    alter_table_drop_column: str = "BLOCK"
+    delete_all_rows: str = "BLOCK"
+    update_all_rows: str = "WARN"
+    large_in_clause: str = "WARN"
+    cross_join: str = "WARN"
+    grant_all: str = "WARN"
     select_star: str = "LOG"
     deep_subquery: str = "LOG"
+    multiple_table_join: str = "LOG"
+    union_without_limit: str = "LOG"
 
 
 @dataclass
