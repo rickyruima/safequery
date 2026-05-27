@@ -30,7 +30,7 @@ result = sq.check("DELETE FROM users")
 # result.reason == "DELETE without WHERE clause on table(s): users"
 ```
 
-No API calls. No network latency. No LLM-checking-LLM nonsense. Pure deterministic verification in under 5ms.
+No API calls. No network latency. No LLM-checking-LLM nonsense. Pure deterministic verification in well under a millisecond.
 
 ---
 
@@ -56,8 +56,8 @@ SafeQuery is a **deterministic verifier**. AST parsing + rule engine. No probabi
 ## Features
 
 - **17 safety rules** across BLOCK / WARN / LOG severity levels
-- **SQL AST parsing** via pglast — not regex, not string matching
-- **Zero latency** — runs locally, no API calls, P99 < 5ms
+- **SQL AST parsing** via [sqlglot](https://github.com/tobymao/sqlglot) — not regex, not string matching; works across dialects (Postgres, MySQL, SQLite, …), Postgres by default
+- **Zero latency** — runs locally, no API calls (measured P99 ≈ 0.2ms, see `benchmarks/`)
 - **YAML configuration** — customize rules, actions, and protected tables
 - **Protected tables** — mark critical tables for extra scrutiny
 - **CLI tool** — check queries from the terminal, integrate into CI
