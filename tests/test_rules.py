@@ -172,6 +172,20 @@ class TestLogRules:
         rules = [v.rule for v in violations]
         assert "union_without_limit" not in rules
 
+    def test_deep_subquery(self):
+        sql = "SELECT id FROM (SELECT id FROM (SELECT id FROM (SELECT id FROM users)))"
+        violations = _check(sql)
+        rules = [v.rule for v in violations]
+        assert "deep_subquery" in rules
+        v = next(v for v in violations if v.rule == "deep_subquery")
+        assert v.action == "LOG"
+
+    def test_shallow_subquery_no_violation(self):
+        sql = "SELECT id FROM (SELECT id FROM users)"
+        violations = _check(sql)
+        rules = [v.rule for v in violations]
+        assert "deep_subquery" not in rules
+
 
 class TestSafeQueries:
     def test_select_with_columns(self):
